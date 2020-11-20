@@ -6,7 +6,7 @@ namespace Illie.Chat
 {
     class Cli
     {
-        UserService userService = new UserService();
+        private readonly UserService userService = new UserService();
         public void Run()
         {
             Console.WriteLine("1) Register");
@@ -18,28 +18,16 @@ namespace Illie.Chat
 
                 if (registeredUser != null)
                 {
-                    User loggedInUser = Login();
-                    if (loggedInUser != null)
-                    {
-                        DisplayOptions(loggedInUser);
-                    }
-                    else
-                    {
-                        Console.WriteLine("Your login was unsuccessful.");
-                    }
+                    HandleLogin();
+                }
+                else
+                {
+                    Console.WriteLine("Your registration was unsuccessful.");
                 }
             }
             else if (loginOrRegister == "2")
             {
-                User loggedInUser = Login();
-                if (loggedInUser != null)
-                {
-                    DisplayOptions(loggedInUser);
-                }
-                else
-                {
-                    Console.WriteLine("Your login was unsuccessful.");
-                }
+                HandleLogin();
             }
             else
             {
@@ -73,33 +61,28 @@ namespace Illie.Chat
 
             User user = userService.Register(username, password, emailAddress);
 
-            if (user != null)
+            return user;
+        }
+
+        private void HandleLogin()
+        {
+            User loggedInUser = Login();
+            while (loggedInUser != null)
             {
-                return user;
+                DisplayOptions(loggedInUser);
             }
-            else return null;
+            Console.WriteLine("Your login was unsuccessful.");
         }
 
         private User Login()
         {
             string username = RequestStringInput("username");
             string password = RequestStringInput("password");
-            bool loggedIn = false;
             User user = userService.Login(username, password);
+            bool loggedIn = user != null;
 
-            try
-            {
-                if (user != null)
-                {
-                    loggedIn = true;
-                    return user;
-                }
-                else return null;
-            }
-            finally 
-            {
-                DisplayLoginMessage(loggedIn);
-            }
+            DisplayLoginMessage(loggedIn);
+            return user;
         }
 
         private void DisplayOptions(User loggedInUser)
@@ -108,17 +91,17 @@ namespace Illie.Chat
             Console.WriteLine("2) View inbox");
             Console.WriteLine("3) View sent messages");
 
-            int option = int.Parse(Console.ReadLine());
+            bool isParsed = int.TryParse(Console.ReadLine(), out int option);
             switch (option)
             {
                 case 1:
                     SendMessage(loggedInUser);
                     break;
                 case 2:
-                    Console.WriteLine("Tuesday");
+                    ViewMessages(loggedInUser, false);
                     break;
                 case 3:
-                    Console.WriteLine("Wednesday");
+                    ViewMessages(loggedInUser, true);
                     break;
             }
         }
@@ -127,13 +110,51 @@ namespace Illie.Chat
         {
             string recipient = RequestStringInput("recipient username");
             string message = RequestStringInput("message");
+            string photoUrl = null;
 
             Console.WriteLine("Do you have a photo to attach? Y/N");
             string photoAttached = Console.ReadLine();
 
             if (photoAttached == "y" || photoAttached == "Y")
             {
-                AttachPhoto();
+                photoUrl = RequestStringInput("photo URL");
+            }
+
+            bool messageSent = userService.SendMessage(message, loggedInUser, recipient, photoUrl);
+
+            if (messageSent == true)
+            {
+                Console.WriteLine("Your message was sent successfully!");
+            }
+            else
+            {
+                Console.WriteLine("Your message was not sent.");
+            }
+        }
+
+        private void ViewMessages(User loggedInUser, bool sentOrReceived)
+        {
+            List<Message> messages;
+
+            if (sentOrReceived)
+            {
+                Console.WriteLine($"Messages sent by {loggedInUser.Username}:");
+                messages = userService.ViewMessages(loggedInUser, sentOrReceived);
+
+                foreach (Message message in messages)
+                {
+                    Console.WriteLine($"{message.MessageText} : {message.RecipientId}");
+                }
+            }
+            else
+            {
+                Console.WriteLine($"{loggedInUser.Username}'s Inbox:");
+                messages = userService.ViewMessages(loggedInUser, sentOrReceived);
+
+                foreach (Message message in messages)
+                {
+                    Console.WriteLine($"{message.MessageText} : {message.SenderId}");
+                }
             }
         }
     }

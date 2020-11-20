@@ -29,9 +29,10 @@ namespace Illie.Chat
                     {
                         User user = new User
                         {
-                            username = reader[1].ToString(),
-                            password = reader[2].ToString(),
-                            email = reader[3].ToString()
+                            Id = (int)reader[0],
+                            Username = reader[1].ToString(),
+                            Password = reader[2].ToString(),
+                            Email = reader[3].ToString()
                         };
                         reader.Close();
                         UpdateLastLoggedInTime(givenUsername);
@@ -71,14 +72,12 @@ namespace Illie.Chat
         {
             AddUserToDatabase(username, password, email);
 
-            User user = new User
+            return new User
             {
-                username = username,
-                password = password,
-                email = email
+                Username = username,
+                Password = password,
+                Email = email
             };
-
-            return user;
         }
 
         private int GetIdFromUsername(string username)
@@ -103,19 +102,75 @@ namespace Illie.Chat
                 }
             }
 
-            return 0;
+            return -1;
         }
 
-        public void SendMessage(string message, string sender, string recipient)
+        public int AddMessageToDatabase(string message, string sender, string recipient)
         {
-            string query = $@"INSERT INTO Messages VALUES('{message}', '{GetIdFromUsername(sender)}', '{GetIdFromUsername(recipient)}')";
+            string query = $@"INSERT INTO Messages VALUES('{message}', '{GetIdFromUsername(sender)}', '{GetIdFromUsername(recipient)}');SELECT SCOPE_IDENTITY();";
+            SqlCommand command = new SqlCommand(query, _connection);
+
+            _connection.Open();
+            int messageId = Convert.ToInt32(command.ExecuteScalar());
+
+            _connection.Close();
+
+            return messageId;
+        }
+
+        public int AddPhotoToDatabase(int messageId, string photoUrl)
+        {
+            string query = $@"INSERT INTO Photos VALUES('{photoUrl}', GetDate(), {messageId});SELECT SCOPE_IDENTITY();";
+            SqlCommand command = new SqlCommand(query, _connection);
+
+            _connection.Open();
+            int photoId = Convert.ToInt32(command.ExecuteScalar());
+
+            _connection.Close();
+
+            return photoId;
+        }
+
+        public List<Message> GetMessagesByUser(int userId, bool sentOrReceived)
+        {
+            List<Message> messages = new List<Message>();
+
+            string query;
+
+            if (sentOrReceived)
+            {
+                query = $@"SELECT * FROM Messages WHERE SenderId = '{userId}'";
+            }
+            else
+            {
+                query = $@"SELECT * FROM Messages WHERE RecipientId = '{userId}'";
+            }
+
             SqlCommand command = new SqlCommand(query, _connection);
 
             _connection.Open();
             SqlDataReader reader = command.ExecuteReader();
 
-            reader.Close();
-            _connection.Close();
+            try
+            {
+                while (reader.Read())
+                {
+                    Message message = new Message
+                    {
+                        Id = (int)reader[0],
+                        MessageText = reader[1].ToString(),
+                        SenderId = (int)reader[2],
+                        RecipientId = (int)reader[3]
+                    };
+                    messages.Add(message);
+                }
+            }
+            finally
+            {
+                reader.Close();
+                _connection.Close();
+            }
+            return messages;
         }
     }
 }

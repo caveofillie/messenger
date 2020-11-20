@@ -7,46 +7,37 @@ namespace Illie.Chat
 {
     class UserService
     {
-        private UserRepository userRepo = new UserRepository(new SqlConnection($@"Server=(localdb)\MSSQLLocalDb;Database=IlliesChatDb;Trusted_Connection=True"));
+        private readonly UserRepository userRepo = new UserRepository(new SqlConnection($@"Server=(localdb)\MSSQLLocalDb;Database=IlliesChatDb;Trusted_Connection=True"));
 
         public User Login(string username, string password)
         {
-            try
-            {
-                if (userRepo.GetUserFromDatabase(username, password) != null)
-                {
-                    return userRepo.GetUserFromDatabase(username, password);
-                }
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e);
-            }
-            return null;
+            User user = userRepo.GetUserFromDatabase(username, password);
+            return user;
         }
 
         public User Register(string username, string password, string email)
         {
-            try
-            {
-                if (userRepo.CreateNewUser(username, password, email) != null)
-                {
-                    return userRepo.CreateNewUser(username, password, email);
-                }
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e);
-            }
-            return null;
+            User user = userRepo.CreateNewUser(username, password, email);
+            return user;
         }
 
-        public void SendMessage(string message, User sender, string recipient)
+        public bool SendMessage(string message, User sender, string recipient, string photoUrl)
         {
-            if (message.Length >= 15)
+            if (message.Length < 15)
             {
-                userRepo.SendMessage(message, sender.username, recipient);
+                return false;
             }
+            int messageId = userRepo.AddMessageToDatabase(message, sender.Username, recipient);
+            if (photoUrl != null)
+            {
+                userRepo.AddPhotoToDatabase(messageId, photoUrl);
+            }
+            return true;
+        }
+
+        public List<Message> ViewMessages(User user, bool sentOrReceived)
+        {
+            return userRepo.GetMessagesByUser(user.Id, sentOrReceived);
         }
     }
 }
